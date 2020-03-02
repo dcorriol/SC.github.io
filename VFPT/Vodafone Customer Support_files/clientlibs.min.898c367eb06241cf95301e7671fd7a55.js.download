@@ -1,0 +1,1 @@
+Vue.config.ignoredElements=["cq"];var contactOptions=new Vue({el:"#contactOptions"});

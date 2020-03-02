@@ -1,0 +1,231 @@
+window.loggedUserMenu = Vue.component('logged-user-menu', {
+    name: 'loggedUserMenu',
+    mixins: [requestHandler, requestValidations, utils, navigation, loadingAnimations],
+    template: '#LoggedUserMenuCmp',
+    props: ['userFavorite', 'closeMenu', 'links'],
+    data: function() {
+
+        return {
+            i18nLabels: {
+                title: 'Pontos Clube Viva', //this.i18nUtils().getProperty('loyalty_points_title')
+            },
+            isLogged: true,
+            isMenuOpen: false,
+            isMenuPopUp: false,
+            hasUserPhoto: false,
+            userPhoto: '',
+            LoggedUserMenuLinks: {
+                links: JSON.parse("[" + this.links + "]")
+            },
+            isMenuPopUpClose: false
+        }
+    },
+    created: function(){
+        document.getElementById("header-menu-mobile").addEventListener('mousedown', this.closeLoggedUserMenu, false);
+        if (typeof UserPhotoBus !== 'undefined') {
+            UserPhotoBus.$on('updatePhoto', this.updateFavouritePhoto);
+            UserPhotoBus.$on('resetPhoto', this.resetFavouritePhoto);
+        }
+    },
+    watch: {
+
+        'userFavorite': function(val, oldVal) {
+            if (Object.keys(val).length === 0 && val.constructor === Object) {
+                document.getElementById('logged--user--menu--photo').remove();
+                this.hasUserPhoto = false;
+                this.userPhoto = 'icon-users';
+            } else {
+                var request = {};
+
+                this.myVdfGet('user', 'getPhoto', request, function(response) {
+                    document.getElementById('logged--user--menu--photo').remove();
+                    if (this.requestValidator().validateStatusCodeAndErrors(response)) {
+                       if (Object.keys(response.body).length === 0) {
+                           this.userPhoto = this.getIconByProfile(this.userFavorite.profile);
+                           this.hasUserPhoto = false;
+                       } else {
+                           this.userPhoto = response.body.photo;
+                           this.hasUserPhoto = true;
+                       }
+                    } else {
+                        this.userPhoto = this.getIconByProfile(this.userFavorite.profile);
+                        this.hasUserPhoto = false;
+                    }
+                }, function() {
+                    document.getElementById('logged--user--menu--photo').remove();
+                    this.hasUserPhoto = false;
+                    this.userPhoto = 'icon-users';
+                }, this);
+            }
+        },
+
+        'closeMenu': function(val, oldVal) {
+            if (this.isMenuOpen) {
+                this.isMenuOpen = !this.isMenuOpen;
+                document.body.classList.remove("body--navigation-fixed");
+
+            }
+            header.$data.closeMenu = undefined;
+        }
+    },
+    methods: {
+        updateFavouritePhoto: function(photo) {
+            this.userPhoto = photo;
+            this.hasUserPhoto = true;
+        },
+
+        resetFavouritePhoto: function(icon) {
+            this.userPhoto = this.getIconByProfile(icon);
+            this.hasUserPhoto = false;
+        },
+
+        closeLoggedUserMenu: function(){
+            this.isMenuOpen = false;
+        },
+        linkVisible: function(link) {
+            //TODO ? Bad approach. Circular reference in use
+            let contextExists = typeof(ContextHub) !== "undefined" && typeof(IS_MYVDF) !== "undefined";
+            let isDelegated = false;
+            if(contextExists) {
+                var activeSegments = this.contextUtils().getActiveSegments();
+                for (var j in activeSegments) {
+
+                    var actSegment = activeSegments[j];
+                    if (actSegment.indexOf("profile-delegated") !== -1) {
+                        isDelegated = true;
+                    }
+                }
+
+            }
+            if (!contextExists || isDelegated) {
+                if (link.linkId.indexOf('Settings') !== -1 || link.linkId.indexOf('homepage') !== -1 || link.linkId.indexOf('logout') !== -1) {
+                    return true;
+                }
+                return false;
+            }
+
+            if (link.linkSegments !== undefined && link.linkSegments !== '' && typeof(ContextHub) !== "undefined") {
+
+                var confSegments = link.linkSegments.split("|");
+                var activeSegments = this.contextUtils().getActiveSegments();
+
+                for (var i in confSegments) {
+
+                    var confSegment = confSegments[i];
+
+                    for (var j in activeSegments) {
+                        var actSegment = activeSegments[j];
+
+                        if (actSegment.indexOf(confSegment) !== -1) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            return true;
+        },
+
+        openLoggedUserMenu: function() {
+
+            if (!this.isMenuOpen && !this.isMenuPopUp) {
+                tealium_homepage.methods.handleClickExpandPortalNavigation();
+                this.closeNavigation();
+                this.isMenuOpen = true;
+                document.body.classList.add("body--navigation-fixed");
+            } else {
+                tealium_homepage.methods.handleClickClosePortalNavigation();
+                this.isMenuOpen = false;
+                document.body.classList.remove("body--navigation-fixed");
+            }
+
+            localStorage.removeItem("firstTimeMenuPopUp");
+            this.isMenuPopUpClose = false;
+            this.isMenuPopUp = false;
+
+        },
+        redirectToPage: function(link) {
+            tealium_homepage.methods.handleClickCategoryOnPortalNavigation(link.linkId);
+
+            if (link.newTab === "true") {
+                window.open(link.pathURL);
+            }else if(link.linkId.toLowerCase() === "logout"){
+                window.location.href = link.pathURL + "?" + "lru=" + encodeURIComponent(window.location.href);
+            } else {
+                window.location.href = link.pathURL;
+            }
+        },
+        getIconByProfile: function(profile) {
+            var icon = '';
+
+            switch (profile) {
+                case 'ACCOUNT':
+                    icon = 'icon-users';
+                    break;
+                case 'GSM':
+                    icon = 'icon-landline-or-call';
+                    break;
+                case 'BLM':
+                    icon = 'icon-broadband-1';
+                    break;
+                case 'FTTH':
+                case 'ADSL':
+                    icon = 'icon-tv';
+                    break;
+                case 'FEMTOCELL':
+                    icon = 'icon-tethering';
+                    break;
+                default:
+                    break;
+            }
+
+            return icon;
+        },
+        
+        closeNavigation: function() {
+
+            var list = headerMenuMobile = document.getElementById("header-menu-mobile");
+
+            if (headerMenuMobile.classList.contains('navigation__item--active')) {
+                document.body.classList.add("body--navigation-fixed");
+                headerMenuMobile.classList.remove('navigation__item--active');
+                headerMenuMobile.getElementsByTagName("a")[0].classList.remove('navigation__link--active');
+                headerMenuMobile.getElementsByTagName("div")[0].classList.remove('navigation--display');
+                headerMenuMobile.getElementsByTagName("div")[0].classList.remove('navigation--closed');
+            }
+            else{
+                document.body.classList.remove("body--navigation-fixed");
+            }
+        },
+
+        closeLoggedUserMenuFadeOut: function (){
+            if(localStorage.getItem('firstTimeMenuPopUp')=== 'true') {
+                this.isMenuPopUpClose = true;
+                this.isMenuPopUp = false;
+                localStorage.removeItem("firstTimeMenuPopUp");
+                window.removeEventListener('scroll', this.closeLoggedUserMenuFadeOut, false);
+                window.removeEventListener('click', this.closeLoggedUserMenuFadeOut, false);
+
+                var me = this;
+                document.getElementById("logged--user--menu--content").addEventListener('transitionend', function(){
+                    me.isMenuPopUpClose = false;
+                });
+            }
+        },
+
+        oppenLoggedUserMenuForFadeOut: function(){
+            this.isMenuPopUp = true;
+
+            window.addEventListener('scroll', this.closeLoggedUserMenuFadeOut, false);
+            window.addEventListener('click',  this.closeLoggedUserMenuFadeOut, false);
+        },
+        isMyVdf: function(){
+             return ((typeof propertiesPath !== 'undefined') && propertiesPath.indexOf("digital-myvodafone") !== -1);
+        },
+    },
+    mounted: function() {
+        if(!this.isMyVdf() && PartnersBus && !window.hostnameForExtSystems){
+            PartnersBus.getContext();
+        }
+    }
+});

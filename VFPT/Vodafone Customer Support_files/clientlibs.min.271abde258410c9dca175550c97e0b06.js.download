@@ -1,0 +1,1 @@
+window.footer=new Vue({mixins:[utils],el:"#getYear",data:function(){return{year:(new Date).getFullYear(),footerText:"Vodafone Portugal"}}});

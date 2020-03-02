@@ -1,0 +1,1 @@
+function footerTealiumRequest(a,b){tealium_header_footer.methods.handleClickFooterEntry(a,b)};
